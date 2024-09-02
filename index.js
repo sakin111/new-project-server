@@ -21,7 +21,11 @@ console.log(process.env.MONGO_user);
 console.log(process.env.MONGO_pass);
 
 
-
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*"); // Or specify the allowed origin
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 
 
 const uri = `mongodb+srv://${process.env.MONGO_user}:${process.env.MONGO_pass}@cluster0.ubtwufv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
