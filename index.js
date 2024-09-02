@@ -2,14 +2,25 @@ const express = require("express")
 const cors = require("cors")
 const app = express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-require('dotenv').config()
+require('dotenv').config();
 const port = process.env.PORT || 5000;
 
 
 
 
 app.use(express.json())
-app.use(cors())
+app.use(cors({
+  origin: ['https://earnest-cactus-351358.netlify.app/', 'http://localhost:5173/']
+}))
+
+
+
+
+console.log(process.env.MONGO_user);
+console.log(process.env.MONGO_pass);
+
+
+
 
 
 const uri = `mongodb+srv://${process.env.MONGO_user}:${process.env.MONGO_pass}@cluster0.ubtwufv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -41,12 +52,12 @@ async function run() {
     res.send(result)
   })
 
-
- app.post("/addToCart" , async (req,res) =>{
-  const ToCart = req.body;
-  const result = await addToCard.insertOne(ToCart);
-  res.send(result)
- })
+  app.post("/addToCart", async (req, res) => {
+    const ToCart = req.body;
+    const result = await addToCart.insertOne(ToCart);
+    res.send(result);
+  });
+  
 
 
   app.get("/card/:id", async (req, res) => {
@@ -82,6 +93,10 @@ async function run() {
       res.status(500).json({ error: "Internal server error" });
     }
   })
+
+
+
+
 
     
 
