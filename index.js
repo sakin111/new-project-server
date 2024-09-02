@@ -12,7 +12,7 @@ app.use(express.json())
 app.use(cors({
   origin: 'https://earnest-cactus-351358.netlify.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true // If you're sending cookies or authorization headers
+  credentials:false // If you're sending cookies or authorization headers
 }));
 
 
