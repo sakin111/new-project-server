@@ -1,8 +1,10 @@
 const express = require("express")
 const cors = require("cors")
 const jwt = require('jsonwebtoken');
+const SSLCommerzPayment = require('sslcommerz-lts')
 const app = express()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { default: axios } = require("axios");
 require('dotenv').config();
 const port = process.env.PORT || 5000;
 
@@ -10,6 +12,7 @@ const port = process.env.PORT || 5000;
 
 
 app.use(express.json())
+app.use(express.urlencoded({extended:true}))
 app.use(cors({
   origin: ['https://earnest-cactus-351358.netlify.app', 'http://localhost:5173'],
   credentials:true, 
@@ -31,6 +34,15 @@ const client = new MongoClient(uri, {
   }
 });
 
+
+const store_id = process.env.store_Id;
+const store_passwd = process.env.store_Passwd;
+const is_live = false 
+
+
+
+
+
 async function run() {
   try {
 
@@ -38,6 +50,7 @@ async function run() {
     const cardMix = client.db("gutigutipa").collection("cardCollectionMix");
     const addToCart = client.db("gutigutipa").collection("addToCart");
     const usersAll = client.db("gutigutipa").collection("Users");
+
 
 
 
@@ -120,49 +133,65 @@ const verifyToken = (req, res, next) => {
 
 // payment getWay
 
-app.post("/create-payment" ,async(req,res) =>{
-const paymentInfo = req.body;
-const initiateData = {
-  store_id: 'devel66dd635867967',
-  store_passwd: 'devel66dd635867967@ssl',
-  total_amount: 100,
-  currency: 'BDT',
-  tran_id: 'REF123',
-  success_url: "http://yoursite.com/success.php",
-  fail_url: "http://yoursite.com/fail.php",
-  cancel_url: "http://yoursite.com/cancel.php",
-  cus_name: "Customer Name",
-  cus_email: "cust@yahoo.com",
-  cus_add1: 'Dhaka',
-  cus_add2: "Dhaka",
-  cus_city: "Dhaka",
-  cus_state: "Dhaka",
-  cus_postcode: 1000,
-  cus_country: "Bangladesh",
-  cus_phone: "01711111111",
-  cus_fax: "01711111111",
-  ship_name: "Customer Name",
-  ship_add1: "Dhaka",
-  ship_add2: "Dhaka",
-  ship_city: 'Dhaka',
-  ship_state: "Dhaka",
-  ship_postcode: 1000,
-  ship_country: "Bangladesh",
-  multi_card_name: "mastercard,visacard,amexcard",
-  value_a: "ref001_A",
-  value_b: "ref002_B",
-  value_c: 'ref003_C',
-  value_d: "ref004_D"
-}
+app.post("/create-payment", async (req, res) => {
+  try {
+    const paymentInfo = req.body;
+    const initiateData = {
+      store_id: store_id, 
+      store_passwd: store_passwd,
+      total_amount: paymentInfo.totalPrice,
+      currency: 'BDT',
+      tran_id: 'REF123',
+      success_url: "http://localhost:5000/success-payment",
+      fail_url: "http://yoursite.com/fail.php",
+      cancel_url: "http://yoursite.com/cancel.php",
+      cus_name: "Customer Name",
+      cus_email: "cust@yahoo.com",
+      cus_add1: 'Dhaka',
+      cus_add2: "Dhaka",
+      cus_city: "Dhaka",
+      cus_state: "Dhaka",
+      cus_postcode: paymentInfo.postCode,
+      cus_country: "Bangladesh",
+      cus_phone: paymentInfo.phoneNumber,
+      cus_fax: "01711111111",
+      shipping_method: "NO",
+      multi_card_name: "mastercard,visacard,amexcard",
+      value_a: "ref001_A",
+      value_b: "ref002_B",
+      value_c: 'ref003_C',
+      value_d: "ref004_D"
+    };
 
+    // Send the POST request to SSLCommerz
+    const response = await axios({
+      method: "POST",
+      url: "https://sandbox.sslcommerz.com/gwprocess/v4/api.php",
+      data: initiateData,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+   console.log(response,"this is response")
+    // Send back the response from SSLCommerz
+    res.send(response.data);
+  } catch (error) {
+    console.error("Error during payment initiation:", error);
+    res.status(500).send("Error initiating payment");
+  }
+});
 
-res.send(result)
+// success url
+
+app.post("/success-payment", async(req,res) =>{
+
+  const successData = req.body
+  console.log(successData,"successData")
 })
 
 
 
-
-
+// card items
 
     app.get("/card/:id", async (req, res) => {
       try {
@@ -240,7 +269,21 @@ res.send(result)
     });
 
 
-
+    app.get("/users/:email", verifyToken, async (req, res) => {
+      try {
+          const email = req.params.email;
+          const query = { email: email };
+          const result = await usersAll.findOne(query);
+          if (!result) {
+              return res.status(404).send({ message: "User not found" });
+          }
+          res.send(result);
+      } catch (error) {
+          console.error("Error fetching user:", error);
+          res.status(500).send({ message: "Server error" }); 
+      }
+  });
+  
 
 
 
@@ -299,6 +342,45 @@ app.delete('/users/:id', verifyToken, AdminVerify, async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
+// user patch to add address
+
+app.patch("/users/email/:email", verifyToken, async (req, res) => {
+  try {
+    const email = req.params.email;  // Get the email from the route params
+    const filter = { email: email }; // Filter the user by email
+
+    const updatedDoc = {
+      $set: {
+        address: req.body.address,
+        phone: req.body.phoneNumber,
+        postcode: req.body.postCode
+      }
+    };
+
+    // Use updateOne for updating the document based on the email
+    const result = await usersAll.updateOne(filter, updatedDoc);
+
+    if (result.modifiedCount === 1) {
+      res.send({ message: "User details updated successfully" });
+    } else {
+      res.status(404).send({ message: "User not found or no change made" });
+    }
+  } catch (error) {
+    console.error('Error updating user details:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
+// add to cart 
+
+app.post("/addToCart", async(req,res) =>{
+  const cart = req.body;
+  const result = await addToCart.insertOne(cart);
+  res.send(result)
+})
 
 
 
