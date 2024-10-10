@@ -60,7 +60,7 @@ async function run() {
     app.post('/jwt', async (req, res) => {
       try {
         const user = req.body;
-        const token = await jwt.sign(user, process.env.JWT_access_TOKEN, { expiresIn: '360d' });
+        const token = await jwt.sign(user, process.env.JWT_access_TOKEN, { expiresIn: '365d' });
         res.send({ token });
       } catch (error) {
         console.error('Error generating JWT token:', error);
@@ -151,6 +151,9 @@ app.post("/create-payment", async (req, res) => {
       cus_add2: "Dhaka",
       cus_city: "Dhaka",
       cus_state: "Dhaka",
+      product_name:paymentInfo.productName,
+      product_category: paymentInfo.productCategory,
+      product_profile:"Baby food",
       cus_postcode: paymentInfo.postCode,
       cus_country: "Bangladesh",
       cus_phone: paymentInfo.phoneNumber,
@@ -269,20 +272,29 @@ app.post("/success-payment", async(req,res) =>{
     });
 
 
-    app.get("/users/:email", verifyToken, async (req, res) => {
+
+    app.get('/users/email/:email',verifyToken, async (req, res) => {
+      const email = decodeURIComponent(req.params.email); // Get email from URL params
+  
       try {
-          const email = req.params.email;
-          const query = { email: email };
-          const result = await usersAll.findOne(query);
-          if (!result) {
-              return res.status(404).send({ message: "User not found" });
+          // Find user in MongoDB by email
+          const user = await usersAll.findOne({ email: email });
+  
+          if (!user) {
+              return res.status(404).json({ message: 'User not found' });
           }
-          res.send(result);
-      } catch (error) {
-          console.error("Error fetching user:", error);
-          res.status(500).send({ message: "Server error" }); 
+  
+          res.json(user); // Return the user data if found
+      } catch (err) {
+          console.error('Error fetching user:', err);
+          res.status(500).json({ message: 'Internal Server Error' });
       }
   });
+
+
+
+
+
   
 
 
@@ -346,41 +358,94 @@ app.delete('/users/:id', verifyToken, AdminVerify, async (req, res) => {
 
 // user patch to add address
 
-app.patch("/users/email/:email", verifyToken, async (req, res) => {
+
+
+app.patch('/users/:email', verifyToken, async (req, res) => {
   try {
-    const email = req.params.email;  // Get the email from the route params
-    const filter = { email: email }; // Filter the user by email
+    const { email } = req.params;
+    const { address, phone, postCode } = req.body;
+
+    // Define the filter to locate the user
+    const filter = { email:email };
 
     const updatedDoc = {
       $set: {
-        address: req.body.address,
-        phone: req.body.phoneNumber,
-        postcode: req.body.postCode
-      }
+        address: address,
+        phoneNumber: phone,
+        postCode: postCode,
+      },
     };
 
-    // Use updateOne for updating the document based on the email
     const result = await usersAll.updateOne(filter, updatedDoc);
-
-    if (result.modifiedCount === 1) {
-      res.send({ message: "User details updated successfully" });
-    } else {
-      res.status(404).send({ message: "User not found or no change made" });
-    }
+    res.send(result);
   } catch (error) {
-    console.error('Error updating user details:', error);
+    console.error('Error updating user role to admin:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 
+
+
 // add to cart 
 
-app.post("/addToCart", async(req,res) =>{
-  const cart = req.body;
-  const result = await addToCart.insertOne(cart);
-  res.send(result)
-})
+app.post("/addToCart",verifyToken, async (req, res) => {
+  try {
+    const cart = req.body;
+    const result = await addToCart.insertOne(cart);  
+    if (result.insertedId) {
+      res.status(200).send({ insertedId: result.insertedId });
+    } else {
+      throw new Error('Insertion failed');
+    }
+  } catch (error) {
+    console.error("Error adding to cart:", error);
+    res.status(500).send({ message: "An error occurred while adding to the cart", error: error.message });
+  }
+});
+
+// add to cart
+
+app.get("/addToCart", async (req, res) => {
+  try {
+    const userEmail = req.query.email;
+    
+    if (!userEmail) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const result = await addToCart.find({ email: userEmail }).toArray();
+
+    if (!result.length) {
+      return res.status(404).json({ message: "No items found for this email" });
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching cart data:", error);
+    res.status(500).json({ message: "An error occurred while fetching cart data", error: error.message });
+  }
+});
+
+// delete addToCart
+
+app.delete('/addToCart/:id', verifyToken, async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    const query = { _id: new ObjectId(id) };
+    const result = await addToCart.deleteOne(query);
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json({ message: 'Item successfully deleted', result });
+  } catch (error) {
+    console.error('Error deleting cart item:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 
 
