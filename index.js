@@ -367,7 +367,7 @@ async function run() {
         const { address, phoneNumber, postCode } = req.body;
 
         // Define the filter to locate the user
-        const filter = { email: email };
+        const filter = {email:email};
 
         const updatedDoc = {
           $set: {
@@ -387,145 +387,225 @@ async function run() {
 
 
 
+// add to cart related  routes 
+
+
 
     // add to cart 
-
-    app.post("/addToCart", verifyToken, async (req, res) => {
-      try {
-        const cart = req.body;
-        const result = await addToCart.insertOne(cart);
-        if (result.insertedId) {
-          res.status(200).send({ insertedId: result.insertedId });
-        } else {
-          throw new Error('Insertion failed');
-        }
-      } catch (error) {
-        console.error("Error adding to cart:", error);
-        res.status(500).send({ message: "An error occurred while adding to the cart", error: error.message });
-      }
+   app.post("/addToCart", verifyToken, async (req, res) => {
+      const ToCart = req.body;
+      const result = await addToCart.insertOne(ToCart);
+      res.send(result);
     });
-
-    // add to cart
-    app.get("/addToCart", verifyToken, async (req, res) => {
-      try {
-        
-
-          const result = await addToCart.find().toArray();
   
-          if (result.length === 0) {
-              return res.status(200).json({ address: null, items: [] });
+// add to cart single  item get method 
+
+
+ app.get("/addToCart/:id/:email", verifyToken, async (req, res) => {
+      try {
+        const {id} = req.params;
+        const email = decodeURIComponent(req.params.email)
+        const query = { _id: new ObjectId(id), email:email }
+        const options = {
+          projection: {
+            _id:1 ,price:1 ,quantity :1,image:1, category:1, name:1,  email:1
           }
-  
-          res.status(200).json(result);
-      } catch (error) {
-          console.error("Error fetching cart data:", error);
-  
-          // Only send serializable parts of the error
-          res.status(500).json({ 
-              message: "An error occurred while fetching cart data", 
-              error: error.message 
-          });
-  
-          // Optionally log the full error stack for debugging purposes
-          console.error("Error stack:", error.stack);
-      }
-  });
-  
-
-
-
-
-    // delete addToCart
-
-    app.delete('/addToCart/:id', verifyToken, async (req, res) => {
-      try {
-        const id = req.params.id;
-        if (!ObjectId.isValid(id)) {
-          return res.status(400).json({ error: 'Invalid ID format' });
         }
-        const query = { _id: new ObjectId(id) };
-        const result = await addToCart.deleteOne(query);
-        if (result.deletedCount === 0) {
-          return res.status(404).json({ error: 'Item not found' });
-        }
-        res.json({ message: 'Item successfully deleted', result });
+        const result = await addToCart.findOne(query, options);
+
+        res.send(result)
       } catch (error) {
-        console.error('Error deleting cart item:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error("Error fetching slider data:", error);
+        res.status(500).json({ error: "Internal server error" });
       }
-    });
+    })
 
 
-    // add to cart
 
 
-    app.patch('/addToCart/:email', verifyToken, async (req, res) => {
-      try {
-        const { email } = req.params;
-        const { address,
-          postCode,
-          phoneNumber,
-          paymentMethod,
-          shippingZone, } = req.body;
-
-        // Define the filter to locate the user
-        const filter = { email: email };
-
-        const updatedDoc = {
-          $set: {
-            method:paymentMethod,
-            Zone:  shippingZone,
-            address:address,
-            phone:phoneNumber,
-            postCode:postCode
-          },
-        };
-
-        const result = await addToCart.updateOne(filter, updatedDoc);
-        res.send(result);
-      } catch (error) {
-        console.error('Error updating user role to admin:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
 
 
-// my orders   
 
-
-app.post("/myOrder", verifyToken, async (req, res) => {
+// GET /addToCart - Retrieve the current user's cart
+app.get("/addToCart/:email", verifyToken, async (req, res) => {
   try {
-    const {
-      email, 
-      products,
-      address, postCode, phone, method, Zone
-    } = req.body;
+    const userEmail = decodeURIComponent(req.params.email);
 
-console.log("Received Order Data:", req.body);
-    const order = {
-      email,
-      products,
-      address,
-      postCode,
-      phone,
-      method,
-      Zone,
-      orderDate: new Date()  
-    };
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is missing." });
+    }
 
-    // Insert the order into the MongoDB collection
-    const result = await myOrder.insertOne(order);
+    // Fetch all cart items matching the email
+    const cart = await addToCart.find({ email: userEmail }).toArray();
 
-    res.send({ success: true, message: "Order received successfully", orderId: result.insertedId });
+    // If no cart is found, return default empty cart response
+    if (!cart || cart.length === 0) {
+      return res.status(200).json([{ 
+        address: null, 
+        postCode: null, 
+        phoneNumber: null, 
+        paymentMethod: "", 
+        shippingZone: "", 
+        
+      }]);
+    }
+
+    // Return all matching cart items
+    res.status(200).json(cart);
   } catch (error) {
-    console.error("Error processing order:", error);
-    res.status(500).send({ success: false, message: "Internal server error" });
+    console.error("Error fetching cart data:", error);
+    res.status(500).json({ 
+      message: "An error occurred while fetching cart data", 
+      error: error.message 
+    });
+  }
+});
+
+// DELETE - Remove a product from the cart
+
+
+app.delete('/addToCart/:id', verifyToken, async (req, res) => {
+  try {
+
+    const id = req.params.id; 
+    const query = { _id: new ObjectId(id) }
+    const result = await addToCart.deleteOne(query)
+
+    if (result.modifiedCount === 0) {
+      console.error("Product not found in cart.");
+      return res.status(404).json({ error: 'Product not found in cart' });
+    }
+
+    res.json({ message: 'Product successfully removed from cart', result });
+  } catch (error) {
+    console.error('Error deleting cart item:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// get the checkout specific data
+
+
+
+
+ // PATCH /addToCart - Update cart details
+ app.patch('/addToCart/:id', verifyToken, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { check} = req.body;
+
+    // Validate that the ID is provided
+    if (!id) {
+      return res.status(400).json({ error: 'Cart item ID is required.' });
+    }
+
+    // Prepare the update document based on the provided fields
+    const updateDoc = { $set: {} };
+
+    // Add fields to the update document if they are provided
+    if (check) updateDoc.$set.check = check;
+  
+
+    // If no fields are provided, return an error
+    if (Object.keys(updateDoc.$set).length === 0) {
+      return res.status(400).json({ error: 'At least one field to update is required.' });
+    }
+
+    // Find the cart item by ID and update the provided fields
+    const filter = { _id: new ObjectId(id) };
+    const result = await addToCart.updateOne(filter, updateDoc);
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Cart item not found.' });
+    }
+
+    // If the item was found and updated, send success response
+    res.json({ success: true, modifiedCount: result.modifiedCount });
+
+  } catch (error) {
+    console.error('Error updating cart item:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 
+// my orders   
+
+// POST /myOrder - Place an order
+ app.post("/myOrder", verifyToken, async (req, res) => {
+  try {
+    const order = req.body;
+    console.log("this is  my order data", req.body)
+
+ 
+    // Insert the order into the "myOrder" collection
+    const result = await myOrder.insertOne(order);
+
+    // Respond with success, sending back the order ID
+    res.status(201).send({
+      success: true,
+      message: "Order received successfully",
+      orderId: result.insertedId, // Order ID from MongoDB
+    });
+  } catch (error) {
+    // Handle any errors during the order creation process
+    console.error("Error creating order:", error);
+    res.status(500).send({
+      success: false,
+      message: "Failed to create the order. Please try again.",
+    });
+  }
+});
 
 
+// my order get
+
+app.get("/myOrder", verifyToken, AdminVerify, async (req, res) => {
+      const result = await myOrder.find().toArray();
+      res.status(200).json(result);
+    });
+
+// approve patch myOrder
+
+app.patch('/myOrder/:id', verifyToken, AdminVerify, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const filter = { _id: new ObjectId(id) };
+    const updatedDoc = {
+      $set: {
+        approve: 'approved'
+      }
+    }
+    const result = await myOrder.updateOne(filter, updatedDoc);
+    res.send(result);
+  } catch (error) {
+    console.error('Error updating user role to admin:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// delete approved item from the database 
+
+
+
+app.delete('/myOrder/:id', verifyToken,AdminVerify, async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    const query = { _id: new ObjectId(id) };
+    const result = await myOrder.deleteOne(query);
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json({ message: 'Item successfully deleted', result });
+  } catch (error) {
+    console.error('Error deleting cart item:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 
     await client.db("admin").command({ ping: 1 });
