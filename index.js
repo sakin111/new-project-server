@@ -1157,89 +1157,89 @@ app.delete('/addToCart/:id', verifyToken, async (req, res) => {
 
 // order stats aggregation 
 
-app.get("/orderStats", verifyToken, AdminVerify, async (req, res) => {
-  try {
+// app.get("/orderStats", verifyToken, AdminVerify, async (req, res) => {
+//   try {
 
 
 
 
 
 
-  const result = await myOrder.aggregate([
-  { $unwind: "$cartItems" },
-  { $match: { "cartItems.id": { $exists: true, $ne: "" } } },
-  // Debug: Log documents after $match
-  {
-    $project: {
-      "cartItems.id": 1,
-      "cartItems.size": 1,
-      "cartItems.quantity": 1
-    }
-  }
-]).toArray();
+//   const result = await myOrder.aggregate([
+//   { $unwind: "$cartItems" },
+//   { $match: { "cartItems.id": { $exists: true, $ne: "" } } },
+//   // Debug: Log documents after $match
+//   {
+//     $project: {
+//       "cartItems.id": 1,
+//       "cartItems.size": 1,
+//       "cartItems.quantity": 1
+//     }
+//   }
+// ]).toArray();
 
-console.log(result, "after $match");
+// console.log(result, "after $match");
 
-    res.status(200).send(stats);
-  } catch (error) {
-    console.error("Error fetching order stats:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+//     res.status(200).send(stats);
+//   } catch (error) {
+//     console.error("Error fetching order stats:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
 
-// admin stats 
+// // admin stats 
 
-app.get('/admin-stats', verifyToken, AdminVerify, async (req, res) => {
-  const users = await usersAll.estimatedDocumentCount();
-  const cardAll = await card.estimatedDocumentCount();
-  const orders = await myOrder.estimatedDocumentCount();
-
-
+// app.get('/admin-stats', verifyToken, AdminVerify, async (req, res) => {
+//   const users = await usersAll.estimatedDocumentCount();
+//   const cardAll = await card.estimatedDocumentCount();
+//   const orders = await myOrder.estimatedDocumentCount();
 
 
-  const result = await myOrder.aggregate([
-    {
-      $unwind: '$cartItems'
-    },
-    {"cartProduct": {toobject: "$cartItems.id"}},
-    {
-      $lookup: {
-        from: 'card',
-        localField: 'cartProduct',
-        foreignField: '_id',
-        as: 'items'
-      }
-    },
-    {
-      $unwind: '$items'
-    },
-    {
-      $group: {
-        _id: null,
-        quantity:{ $sum: 1 },
-        revenue: { $sum: '$items.price'} 
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        quantity: '$quantity',
-       totalRevenue:{
-        multiply: ['$quantity', '$revenue']
-       }
-      }
-    }
-  ]).toArray();
 
-  const revenue = result.length > 0 ? result[0].totalRevenue : 0;
 
-  res.send({
-    users,
-    cardAll,
-    orders,
-    revenue
-  })
-})
+//   const result = await myOrder.aggregate([
+//     {
+//       $unwind: '$cartItems'
+//     },
+//     {"cartProduct": {toobject: "$cartItems.id"}},
+//     {
+//       $lookup: {
+//         from: 'card',
+//         localField: 'cartProduct',
+//         foreignField: '_id',
+//         as: 'items'
+//       }
+//     },
+//     {
+//       $unwind: '$items'
+//     },
+//     {
+//       $group: {
+//         _id: null,
+//         quantity:{ $sum: 1 },
+//         revenue: { $sum: '$items.price'} 
+//       }
+//     },
+//     {
+//       $project: {
+//         _id: 0,
+//         quantity: '$quantity',
+//        totalRevenue:{
+//         multiply: ['$quantity', '$revenue']
+//        }
+//       }
+//     }
+//   ]).toArray();
+
+//   const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+//   res.send({
+//     users,
+//     cardAll,
+//     orders,
+//     revenue
+//   })
+// })
 
 
 
