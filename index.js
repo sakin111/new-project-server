@@ -95,7 +95,7 @@ async function run() {
           httpOnly: true,
           maxAge: 30 * 24 * 60 * 60 * 1000, // 1 month
           sameSite: "lax",
-          secure: true, // Set to true in production
+          secure: process.env.NODE_ENV === "production",
         });
        
       } else {
