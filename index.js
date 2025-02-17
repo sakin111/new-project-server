@@ -72,10 +72,7 @@ async function run() {
     const myOrder = client.db("gutigutipa").collection("myOrder");
     const guestCarts = client.db("gutigutipa").collection("myGuest");
     const guestCartsApprove = client.db("gutigutipa").collection("myGuestApprove");
-
-
-
-
+    const newOne = client.db("gutigutipa").collection("newOne");
 
 
 
@@ -87,10 +84,10 @@ async function run() {
 
     app.post("/addToCartCookies", async (req, res) => {
       const { addInfo } = req.body;
+
+      // Retrieve or initialize sessionId
       let sessionId = req.cookies.guestSessionId;
-
-
-
+    
       // If no session ID is present, create a new one and set the cookie
       if (!sessionId) {
         sessionId = Math.random().toString(36).substring(2);
@@ -98,26 +95,31 @@ async function run() {
           httpOnly: true,
           maxAge: 30 * 24 * 60 * 60 * 1000, // 1 month
           sameSite: "lax",
-          secure: false,  // Set to true only in production
+          secure: false, // Set to true in production
         });
-        console.log("New session ID created and set in cookie:", sessionId);
+       
       } else {
-        console.log("Existing session ID found in cookie:", sessionId);
+        
       }
-
+    
       // Validate addInfo presence
       if (!addInfo) {
         return res.status(400).json({ error: "Missing addInfo in request body" });
       }
-
+    
       try {
-        // Insert or update the cart data in the database
+        // Insert or update the cart data in the database with a timestamp
+        const expirationDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 1 month from now
+    
         await guestCarts.updateOne(
           { sessionId },
-          { $push: { cart: { _id: new ObjectId(), ...addInfo } } },
+          {
+            $push: { cart: { _id: new ObjectId(), ...addInfo } },
+            $set: { expirationDate }, // Use $set to update or add expirationDate
+          },
           { upsert: true }
         );
-
+    
         console.log("Item added to cart for session:", sessionId);
         res.status(200).json({ message: "Item added to cart" });
       } catch (error) {
@@ -125,7 +127,25 @@ async function run() {
         res.status(500).json({ error: "Internal server error" });
       }
     });
+    
+    // Cleanup expired sessions (example: run this on a scheduled job or a cron job)
+    const cleanupExpiredSessions = async () => {
+      try {
+        const result = await guestCarts.deleteMany({ expirationDate: { $lt: new Date() } });
+        console.log(`${result.deletedCount} expired sessions removed.`);
+      } catch (error) {
+        console.error("Error cleaning up expired sessions:", error);
+      }
+    };
+    
+    // Call the cleanup function periodically (e.g., once a day)
+    setInterval(cleanupExpiredSessions, 24 * 60 * 60 * 1000); // Run once every 24 hours
+    
 
+
+
+
+    
 
 
 
@@ -144,90 +164,307 @@ async function run() {
     });
 
 
-    // destructure the addInfo
 
-    app.get("/addToCartCookies/:id", async (req, res) => {
-
-
-      try {
-        const id = req.params
-        const query = {_id: new ObjectId(id)}
-        const options = {
-          projection: {
-            _id: 1, price: 1, quantity: 1, image: 1, category: 1, name: 1
-          }
-        }
-        const result = await addToCart.findOne(query, options);
-
-        res.send(result)
-
-      } catch (error) {
-        console.error('Error deleting cart item:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    })
-
-
-
-    app.get("/OrderCookies", async (req, res) => {
-
-
-      try {
-        const {cookiesItem} = req.body
-
-        const result = await guestCartsApprove.findOne({cookiesItem});
-
-        res.send(result)
-
-      } catch (error) {
-        console.error('Error deleting cart item:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    })
-
-
-
-// cookies checked   
-
-
-app.patch('/addToCartCookies/:id', async (req, res) => {
+ 
+    // address patch 
+app.patch('/addCookiesAddress', async (req, res) => {
   try {
-    const id = req.params.id;
-    const { check } = req.body;
+    const packageData = req.body;  // Get the entire body, as the frontend sends it as { packageData: ... }
+    console.log(packageData, " this is package ");
 
-    // Validate that the ID is provided
-    if (!id) {
-      return res.status(400).json({ error: 'Cart item ID is required.' });
+    // The rest of your logic remains the same
+    const sessionId = req.cookies.guestSessionId;
+
+    if (!sessionId) {
+      return res.status(400).json({ message: 'Session ID is required.' });
     }
 
-    // Prepare the update document based on the provided fields
-    const updateDoc = { $set: {} };
-
-    // Add fields to the update document if they are provided
-    if (check) updateDoc.$set.check = check;
-
-
-    // If no fields are provided, return an error
-    if (Object.keys(updateDoc.$set).length === 0) {
-      return res.status(400).json({ error: 'At least one field to update is required.' });
+    if (!packageData) {
+      return res.status(400).json({ message: 'Address is required.' });
     }
 
-    // Find the cart item by ID and update the provided fields
-    const filter = { _id: new ObjectId(id) };
+    // Define the filter and update operation
+    const filter = { sessionId };
+    const updateDoc = {
+      $set: { packageData },
+    };
+
+    // Perform the update
     const result = await guestCarts.updateOne(filter, updateDoc);
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ message: 'Cart item not found.' });
+      return res.status(404).json({ message: 'Document not found.' });
     }
 
-    // If the item was found and updated, send success response
+    // Respond with success
     res.json({ success: true, modifiedCount: result.modifiedCount });
-
   } catch (error) {
-    console.error('Error updating cart item:', error);
+    console.error('Error updating document:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+
+
+
+    // destructure the addInfo
+
+
+app.get("/addToCartCookies/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+   
+
+    // Convert the string ID into an ObjectId
+    const objectId = new ObjectId(id);  // Convert to ObjectId here
+
+ 
+
+    // Query to search inside the cart array
+    const query = { "cart._id": objectId };
+
+    const options = {
+      projection: {
+        cart: { $elemMatch: { _id: objectId } },
+      },
+    };
+
+    const result = await guestCarts.findOne(query, options);
+
+
+
+    // Handle case where no matching data is found
+    if (!result || !result.cart || result.cart.length === 0) {
+      return res.status(404).json({ message: "Cookie not found" });
+    }
+
+    // Return the matched cart item
+    res.send(result.cart[0]);
+  } catch (error) {
+    console.error("Error fetching cart item:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+    // single item
+
+    // app.get("/addToCartCookies/:id", async (req, res) => {
+    //   try {
+    //     const { id } = req.params;
+    
+    //     // Validate ID format
+    //     if (!ObjectId.isValid(id)) {
+    //       return res.status(400).json({ message: "Invalid ID format" });
+    //     }
+    
+    //     // Query the document and fetch only the matching cart item
+    //     const result = await guestCarts.findOne({ _id: new ObjectId({id}) });
+ 
+    
+    //     if (!result || !result.cart || result.cart.length === 0) {
+    //       return res.status(404).json({ message: "Item not found" });
+    //     }
+   
+    //     res.status(200).json(result); // Return the specific item
+    //   } catch (error) {
+    //     console.error("Error fetching cart item:", error);
+    //     res.status(500).json({ error: "Internal Server Error" });
+    //   }
+    // });
+
+// app.post("/OrderCookies", async (req, res) => {
+//   try {
+//     const { cookiesItem } = req.body; // Access the cookies item from the request body
+
+//     // Process the order with cookiesItem
+//     const result = await guestCartsApprove.insertOne({ cookiesItem });
+
+//     res.send(result);
+//   } catch (error) {
+//     console.error('Error placing order:', error);
+//     res.status(500).json({ error: 'Internal Server Error' });
+//   }
+// });
+
+
+
+
+    // cookies checked   
+
+
+//  app.patch('/CartCookies', async (req, res) => {
+//   try {
+//     const { check, payload } = req.body;
+    
+
+//     if (!check) {
+//       return res.status(400).json({ error: 'The "check" field is required.' });
+//     }
+
+//     const sessionId = req.cookies.guestSessionId;
+
+//     if (!sessionId) {
+//       return res.status(400).json({ error: 'Session ID is missing in cookies.' });
+//     }
+
+//     // Perform the update
+//     const result = await guestCarts.updateOne(
+//       { sessionId }, // Filter by session ID
+//       { $set: { check, ...payload } }, // Update fields
+    
+//     );
+
+//     if (result.matchedCount === 0) {
+//       return res.status(404).json({ message: 'No matching cart items found for the session.' });
+//     }
+
+//     res.json({ success: true, modifiedCount: result.modifiedCount });
+//   } catch (error) {
+//     console.error("Error updating cart:", error);
+//     res.status(500).json({ error: 'Internal Server Error', details: error.message });
+//   }
+// });
+
+    
+    
+// cookies add address 
+
+// app.patch('/addCookiesAddress', async (req, res) => {
+//   try {
+//     const { cookiesAddress } = req.body;  // This is the updated address
+
+
+//     if (!cookiesAddress) {
+//       return res.status(400).json({ error: 'The "cookiesAddress" field is required.' });
+//     }
+
+//     const sessionId = req.cookies.guestSessionId;  // Get the session ID from cookies
+
+//     if (!sessionId) {
+//       return res.status(400).json({ error: 'Session ID is missing in cookies.' });
+//     }
+
+//     // Update the cookiesAddress, clear the cart, and reset the check status
+//     const updateResult = await guestCarts.updateOne(
+//       { sessionId }, // Filter by session ID
+//       {
+//         $set: {
+//           cookiesAddress,   // Update cookiesAddress with new data
+//         },
+      
+//       }
+//     );
+
+//     if (updateResult.matchedCount === 0) {
+//       return res.status(404).json({ message: 'No matching cart items found for the session.' });
+//     }
+
+//     res.json({
+//       success: true,
+//       modifiedCount: updateResult.modifiedCount // Return how many documents were modified
+//     });
+//   } catch (error) {
+//     console.error("Error updating cart:", error);
+//     res.status(500).json({ error: 'Internal Server Error', details: error.message });
+//   }
+// });
+
+
+
+
+
+
+app.post("/cookiesOrder", async (req, res) => {
+  try {
+    const {cookiesOrderData} = req.body;
+    const sessionId = req.cookies.guestSessionId
+
+    // Insert the order into the "myOrder" collection
+    const result = await guestCartsApprove.insertOne(cookiesOrderData);
+    const updateResult = await guestCarts.updateOne(
+      { sessionId }, // Filter by session ID
+      { $set: { cart: [] } }
+    );
+
+        // Check if the update was successful
+        if (updateResult.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "Session not found. Failed to update the cart.",
+          });
+        }
+
+    // Respond with success, sending back the order ID
+    res.status(201).send({
+      success: true,
+      message: "Order received successfully",
+      orderId: result.insertedId, // Order ID from MongoDB
+    });
+  } catch (error) {
+    // Handle any errors during the order creation process
+    console.error("Error creating order:", error);
+    res.status(500).send({
+      success: false,
+      message: "Failed to create the order. Please try again.",
+    });
+  }
+});
+
+// stored address 
+
+app.get("/fetchUserAddress", async (req, res) => {
+  try {
+    const sessionId = req.cookies.guestSessionId;
+
+    if (!sessionId) {
+      return res.status(400).send({ message: "Session ID not found in cookies." });
+    }
+
+    const result = await guestCarts.findOne({ sessionId });
+
+    if (!result) {
+      return res.status(404).send({ message: "No address found for this session." });
+    }
+
+    res.send(result);
+  } catch (error) {
+    console.error("Error fetching user address:", error);
+    res.status(500).send({ message: "Internal server error. Please try again later." });
+  }
+});
+
+
+// add to cart delete   
+
+
+app.delete('/addToCartCookies/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Validate ObjectId
+    if (!ObjectId.isValid(id)) {
+      console.error("Invalid ObjectId:", id);
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
+
+      const query = { "cart._id": new ObjectId(id) };
+    const update = { $pull: { cart: { _id: new ObjectId(id) } } };
+    const result = await guestCarts.updateOne(query, update);
+
+    // Check if the product was deleted
+    if (result.deletedCount === 0) {
+      console.error("Product not found in cart.");
+      return res.status(404).json({ error: 'Product not found in cart' });
+    }
+
+    res.json({ message: 'Product successfully removed from cart' });
+  } catch (error) {
+    console.error('Error deleting cart item:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 
 
@@ -242,7 +479,7 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
     app.post('/jwt', async (req, res) => {
       try {
         const user = req.body;
-        const token = await jwt.sign(user, process.env.JWT_access_TOKEN, { expiresIn: '365d' });
+        const token = await jwt.sign(user, process.env.JWT_access_TOKEN, { expiresIn: '706d' });
         res.send({ token });
       } catch (error) {
         console.error('Error generating JWT token:', error);
@@ -253,24 +490,33 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
     // Middleware to verify JWT token
     const verifyToken = (req, res, next) => {
       try {
-        if (!req.headers.authorization) {
-          return res.status(401).send({ message: 'Unauthorized access: No token provided' });
+        const authHeader = req.headers.authorization;
+    
+        if (!authHeader) {
+          return res.status(401).json({ success: false, message: "Unauthorized: No token provided" });
         }
-        const token = req.headers.authorization.split(' ')[1];
+    
+        const token = authHeader.split(" ")[1];
+    
+        if (!token) {
+          return res.status(403).json({ success: false, message: "Forbidden: Token is missing" });
+        }
+    
         jwt.verify(token, process.env.JWT_access_TOKEN, (err, decoded) => {
           if (err) {
-            console.error('Error verifying JWT token:', err);
-            return res.status(401).send({ message: 'Unauthorized access: Invalid token' });
+            console.error("JWT verification error:", err);
+            return res.status(401).json({ success: false, message: "Unauthorized: Invalid token" });
           }
-          req.decoded = decoded;
-          next();
+    
+          req.decoded = decoded; // Attach decoded data to the request object
+          next(); // Pass control to the next middleware/handler
         });
       } catch (error) {
-        console.error('Error in verifyToken middleware:', error);
-        res.status(500).send({ message: 'Internal Server Error' });
+        console.error("Error in verifyToken middleware:", error);
+        res.status(500).json({ success: false, message: "Internal Server Error" });
       }
     };
-
+    
     // jwt admin
 
     const AdminVerify = async (req, res, next) => {
@@ -293,6 +539,32 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
       }
     }
 
+
+
+
+    const clearGuestSession = (req, res, next) => {
+      try {
+        // Check if the request has a valid decoded token from the previous middleware
+        if (req.decoded) {
+          // Clear the guestSessionId cookie
+          res.clearCookie("guestSessionId", {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+          console.log("Guest session cleared.");
+        }
+    
+        // Continue to the next middleware or route handler
+        next();
+      } catch (error) {
+        console.error("Error in clearGuestSession middleware:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+      }
+    };
+    
+
+
     // card items
 
 
@@ -306,11 +578,12 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
       res.send(result)
     })
 
-    app.post("/addToCart", async (req, res) => {
-      const ToCart = req.body;
-      const result = await addToCart.insertOne(ToCart);
-      res.send(result);
-    });
+    // app.post("/addToCart", async (req, res) => {
+    //   const ToCart = req.body;
+    //   console.log(ToCart)
+    //   const result = await addToCart.insertOne(ToCart);
+    //   res.send(result);
+    // });
 
 
     // payment getWay
@@ -415,7 +688,7 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
     })
 
 
-    app.get("/users", verifyToken, AdminVerify, async (req, res) => {
+    app.get("/users", verifyToken, AdminVerify, clearGuestSession, async (req, res) => {
       try {
         const result = await usersAll.find().toArray();
         res.send(result);
@@ -573,23 +846,132 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
 
 
     // add to cart 
-    app.post("/addToCart", async (req, res) => {
-      const { email, addInfo } = req.body;
 
-      try {
-        // **Case 1**: Check if the email is provided and not null
-        (email)
-        // If the email exists, proceed to save to MongoDB
-        const result = await addToCart.insertOne({ email, ...addInfo });
-        return res.status(200).send({ message: "Item added to MongoDB cart", insertedId: result.insertedId });
+app.post("/addToWishlist",  async (req, res) => {
+  const { email, addInfo } = req.body;
+  console.log("Incoming POST request to /addToWishlist:", req.body);
 
-      } catch (error) {
-        console.error("Error saving to MongoDB:", error);
-        return res.status(500).json({ error: "Internal server error" });
+  // Input Validation
+  if (!email || !addInfo) {
+    console.error("Invalid request body:", req.body);
+    return res.status(400).json({ success: false, message: "Email and addInfo are required." });
+  }
+
+  try {
+    // Prepare the wishlist item
+    const newWishlistItem = {...addInfo };
+
+    // Update or insert operation
+    const result = await addToCart.updateOne(
+      { email }, // Match by email
+      {
+        $setOnInsert: { createdAt: new Date() }, // Set createdAt if this is a new document
+        $set: { updatedAt: new Date() }, // Always update updatedAt
+        $push: { cart: newWishlistItem }, // Push the new item to the wishlist array
+      },
+      { upsert: true } // Insert a new document if no match is found
+    );
+
+    // Check results and respond
+    if (result.upsertedCount > 0) {
+      return res.status(201).json({
+        success: true,
+        message: "New wishlist created and item added.",
+        cart: result.upsertedId._id,
+      });
+    } else if (result.modifiedCount > 0) {
+      return res.status(200).json({
+        success: true,
+        message: "Item added to existing wishlist.",
+      });
+    } else {
+      return res.status(200).json({
+        success: false,
+        message: "No changes were made, item may already exist.",
+      });
+    }
+  } catch (error) {
+    console.error("Error in /addToWishlist:", error.message);
+    return res.status(500).json({ success: false, message: "Internal server error." });
+  }
+});
+
+    
+
+
+
+
+
+
+// fetchRealAddress get  
+
+app.get("/fetchRealUser", verifyToken, async (req, res) => {
+  try {
+    const {email} = req.body // Extract email from URL params
+
+    if (!email) {
+      return res.status(400).send({ message: "Email is required to fetch user data." });
+    }
+
+    // Fetch the address or cart based on the email
+    const result = await addToCart.findOne({ email });
+
+    if (!result) {
+      return res.status(404).send({ message: "No address found for this email." });
+    }
+
+    res.status(200).send(result);
+  } catch (error) {
+    console.error("Error fetching user address:", error);
+    res.status(500).send({ message: "Internal server error. Please try again later." });
+  }
+});
+
+
+
+
+// address patch 
+
+app.patch('/addToCart', verifyToken, async (req, res) => {
+  try {
+    const { addressData, email } = req.body; // Expect the address to be sent in the request body
+
+    // Validate request body
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    if (!addressData) {
+      return res.status(400).json({ message: 'Address is required.' });
+    }
+
+    // Initialize updateResult before using it
+    let updateResult;
+
+    // Update the cookiesAddress, clear the cart, and reset the check status
+    updateResult = await addToCart.updateOne(
+      { email }, // Filter by email
+      {
+        $set: {
+          addressData, 
+          cart: [],// Update addressData with new data
+        },
+       
       }
-    });
+    );
 
+    // Check if any document was matched
+    if (updateResult.matchedCount === 0) {
+      return res.status(404).json({ message: 'No matching document found for the provided email.' });
+    }
 
+    // Respond with success
+    res.json({ success: true, modifiedCount: updateResult.modifiedCount });
+  } catch (error) {
+    console.error('Error updating document:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 
 
@@ -620,136 +1002,92 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
 
     // all addToCart item
 
-    app.get("/addToCart", verifyToken, async (req, res) => {
-      try {
-        const { email } = req.params;
-        const result = await addToCart.find({ email }).toArray(); // Fetch items for this specific email
-        res.send(result);
+// app.get("/addToCart", verifyToken, async (req, res) => {
+//       try {
+//         const { email } = req.params;
+//         const result = await addToCart.find({ email }).toArray(); // Fetch items for this specific email
+//         res.send(result);
 
-      } catch (error) {
-        console.error("Error fetching cart data:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-      }
-    });
-
-
+//       } catch (error) {
+//         console.error("Error fetching cart data:", error);
+//         res.status(500).json({ error: "Internal Server Error" });
+//       }
+//     });   
 
 
 
-    // GET /addToCart - Retrieve the current user's cart
-    app.get("/addToCart/:email", verifyToken, async (req, res) => {
-      try {
-        const userEmail = decodeURIComponent(req.params.email);
+ 
 
-        if (!userEmail) {
-          return res.status(400).json({ message: "User email is missing." });
-        }
 
-        // Fetch all cart items matching the email
-        const cart = await addToCart.find({ email: userEmail }).toArray();
 
-        // If no cart is found, return default empty cart response
-        if (!cart || cart.length === 0) {
-          return res.status(200).json([{
-            address: null,
-            postCode: null,
-            phoneNumber: null,
-            paymentMethod: "",
-            shippingZone: "",
+// GET /addToCart/:email - Retrieve the current user's cart
+app.get("/addToCart", verifyToken, async (req, res) => {
+  try {
+    const { email } = req.query;  // Use req.query to retrieve the email parameter from URL
+ console.log(email, "this is email")
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
-          }]);
-        }
+    // Fetch cart data based on the email
+    const userCart = await addToCart.findOne({ email }, { projection: { cart: 1 } });
 
-        // Return all matching cart items
-        res.status(200).json(cart);
-      } catch (error) {
-        console.error("Error fetching cart data:", error);
-        res.status(500).json({
-          message: "An error occurred while fetching cart data",
-          error: error.message
-        });
-      }
-    });
+    if (!userCart) {
+      return res.status(404).json({ message: "No cart data found for this email" });
+    }
+   
+
+    // Return only the cart array
+    res.json(userCart.cart);
+  } catch (error) {
+    console.error("Error fetching cart data:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+
+
+
 
     // DELETE - Remove a product from the cart
 
-
-    app.delete('/addToCart/:id', verifyToken, async (req, res) => {
-      try {
-
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) }
-        const result = await addToCart.deleteOne(query)
-
-        if (result.modifiedCount === 0) {
-          console.error("Product not found in cart.");
-          return res.status(404).json({ error: 'Product not found in cart' });
-        }
-
-        res.json({ message: 'Product successfully removed from cart', result });
-      } catch (error) {
-        console.error('Error deleting cart item:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-    // get the checkout specific data
+app.delete('/addToCart/:id', verifyToken, async (req, res) => {
+  try {
+    const id = req.params.id;
 
 
+    const query = { "cart._id": new ObjectId(id) };
+    const update = { $pull: { cart: { _id: new ObjectId(id) } } };
+
+    const result = await addToCart.updateOne(query, update);
+
+    if (result.modifiedCount === 0) {
+      console.error("Product not found in cart.");
+      return res.status(404).json({ error: 'Product not found in cart' });
+    }
+
+    res.json({ message: 'Product successfully removed from cart' });
+  } catch (error) {
+    console.error('Error deleting cart item:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 
-    // PATCH /addToCart - Update cart details
-    app.patch('/addToCart/:id', verifyToken, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const { check } = req.body;
-
-        // Validate that the ID is provided
-        if (!id) {
-          return res.status(400).json({ error: 'Cart item ID is required.' });
-        }
-
-        // Prepare the update document based on the provided fields
-        const updateDoc = { $set: {} };
-
-        // Add fields to the update document if they are provided
-        if (check) updateDoc.$set.check = check;
 
 
-        // If no fields are provided, return an error
-        if (Object.keys(updateDoc.$set).length === 0) {
-          return res.status(400).json({ error: 'At least one field to update is required.' });
-        }
 
-        // Find the cart item by ID and update the provided fields
-        const filter = { _id: new ObjectId(id) };
-        const result = await addToCart.updateOne(filter, updateDoc);
+ 
 
-        if (result.matchedCount === 0) {
-          return res.status(404).json({ message: 'Cart item not found.' });
-        }
+    //myOrder - Place an order
 
-        // If the item was found and updated, send success response
-        res.json({ success: true, modifiedCount: result.modifiedCount });
-
-      } catch (error) {
-        console.error('Error updating cart item:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
-
-
-    // my orders   
-
-    // POST /myOrder - Place an order
     app.post("/myOrder", verifyToken, async (req, res) => {
       try {
-        const order = req.body;
-        console.log("this is  my order data", req.body)
-
-
+        const orderData = req.body;
+   
         // Insert the order into the "myOrder" collection
-        const result = await myOrder.insertOne(order);
+        const result = await myOrder.insertOne(orderData);
 
         // Respond with success, sending back the order ID
         res.status(201).send({
@@ -817,6 +1155,102 @@ app.patch('/addToCartCookies/:id', async (req, res) => {
       }
     });
 
+// order stats aggregation 
+
+app.get("/orderStats", verifyToken, AdminVerify, async (req, res) => {
+  try {
+
+
+
+
+
+
+  const result = await myOrder.aggregate([
+  { $unwind: "$cartItems" },
+  { $match: { "cartItems.id": { $exists: true, $ne: "" } } },
+  // Debug: Log documents after $match
+  {
+    $project: {
+      "cartItems.id": 1,
+      "cartItems.size": 1,
+      "cartItems.quantity": 1
+    }
+  }
+]).toArray();
+
+console.log(result, "after $match");
+
+    res.status(200).send(stats);
+  } catch (error) {
+    console.error("Error fetching order stats:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// admin stats 
+
+app.get('/admin-stats', verifyToken, AdminVerify, async (req, res) => {
+  const users = await usersAll.estimatedDocumentCount();
+  const cardAll = await card.estimatedDocumentCount();
+  const orders = await myOrder.estimatedDocumentCount();
+
+
+
+
+  const result = await myOrder.aggregate([
+    {
+      $unwind: '$cartItems'
+    },
+    {"cartProduct": {toobject: "$cartItems.id"}},
+    {
+      $lookup: {
+        from: 'card',
+        localField: 'cartProduct',
+        foreignField: '_id',
+        as: 'items'
+      }
+    },
+    {
+      $unwind: '$items'
+    },
+    {
+      $group: {
+        _id: null,
+        quantity:{ $sum: 1 },
+        revenue: { $sum: '$items.price'} 
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        quantity: '$quantity',
+       totalRevenue:{
+        multiply: ['$quantity', '$revenue']
+       }
+      }
+    }
+  ]).toArray();
+
+  const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+  res.send({
+    users,
+    cardAll,
+    orders,
+    revenue
+  })
+})
+
+
+
+
+
+
+
+
+
+
+
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -836,3 +1270,8 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log("hey the server is alright")
 })
+
+
+
+
+
