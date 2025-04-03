@@ -66,13 +66,12 @@ async function run() {
   try {
 
     const card = client.db("gutigutipa").collection("cardCollection");
-    const cardMix = client.db("gutigutipa").collection("cardCollectionMix");
     const addToCart = client.db("gutigutipa").collection("addToCart");
     const usersAll = client.db("gutigutipa").collection("Users");
     const myOrder = client.db("gutigutipa").collection("myOrder");
     const guestCarts = client.db("gutigutipa").collection("myGuest");
     const guestCartsApprove = client.db("gutigutipa").collection("myGuestApprove");
-    const newOne = client.db("gutigutipa").collection("newOne");
+    const SliderData = client.db("gutigutipa").collection("SliderData");
 
 
 
@@ -573,10 +572,7 @@ app.delete('/addToCartCookies/:id', async (req, res) => {
       res.send(result)
     })
 
-    app.get("/cardMix", async (req, res) => {
-      const result = await cardMix.find().toArray()
-      res.send(result)
-    })
+ 
 
     // app.post("/addToCart", async (req, res) => {
     //   const ToCart = req.body;
@@ -654,14 +650,18 @@ app.delete('/addToCartCookies/:id', async (req, res) => {
     app.get("/card/:id", async (req, res) => {
       try {
         const id = req.params.id;
-        const query = { _id: new ObjectId(id) }
+      
+        const query = { _id: new ObjectId(id) };
         const options = {
           projection: {
-            imageFront: 1, name: 1, item: 1, title: 1, category: 1, description: 1, images: 1, ingredients: 1, size: 1, count: 1, price: 1, usage: 1, age: 1
+       
+            imageFront: 1, name: 1, item: 1, title: 1, category: 1, description: 1, images: 1, ingredients: 1, size: 1, count: 1, price: 1, usage: 1, age: 1, specifications:1, variant:1, stock:1,materials:1, warranty:1, author:1,
+            publisher:1,ISBN:1,shades:1, expiryDate:1,
           }
         }
         const result = await card.findOne(query, options);
-
+    
+    
         res.send(result)
       } catch (error) {
         console.error("Error fetching slider data:", error);
@@ -669,23 +669,7 @@ app.delete('/addToCartCookies/:id', async (req, res) => {
       }
     })
 
-    app.get("/cardMix/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) }
-        const options = {
-          projection: {
-            imageFront: 1, name: 1, item: 1, title: 1, category: 1, description: 1, images: 1, size: 1, count: 1, price: 1, age: 1
-          }
-        }
-        const result = await cardMix.findOne(query, options);
 
-        res.send(result)
-      } catch (error) {
-        console.error("Error fetching slider data:", error);
-        res.status(500).json({ error: "Internal server error" });
-      }
-    })
 
 
     app.get("/users", verifyToken, AdminVerify, clearGuestSession, async (req, res) => {
@@ -849,7 +833,7 @@ app.delete('/addToCartCookies/:id', async (req, res) => {
 
 app.post("/addToWishlist",  async (req, res) => {
   const { email, addInfo } = req.body;
-  console.log("Incoming POST request to /addToWishlist:", req.body);
+
 
   // Input Validation
   if (!email || !addInfo) {
@@ -903,17 +887,15 @@ app.post("/addToWishlist",  async (req, res) => {
 
 
 
-// fetchRealAddress get  
-
+// stored address get  
 app.get("/fetchRealUser", verifyToken, async (req, res) => {
   try {
-    const {email} = req.body // Extract email from URL params
+    const { email } = req.query; 
 
     if (!email) {
       return res.status(400).send({ message: "Email is required to fetch user data." });
     }
 
-    // Fetch the address or cart based on the email
     const result = await addToCart.findOne({ email });
 
     if (!result) {
@@ -1024,7 +1006,6 @@ app.patch('/addToCart', verifyToken, async (req, res) => {
 app.get("/addToCart", verifyToken, async (req, res) => {
   try {
     const { email } = req.query;  // Use req.query to retrieve the email parameter from URL
- console.log(email, "this is email")
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
@@ -1052,27 +1033,29 @@ app.get("/addToCart", verifyToken, async (req, res) => {
 
     // DELETE - Remove a product from the cart
 
-app.delete('/addToCart/:id', verifyToken, async (req, res) => {
-  try {
-    const id = req.params.id;
-
-
-    const query = { "cart._id": new ObjectId(id) };
-    const update = { $pull: { cart: { _id: new ObjectId(id) } } };
-
-    const result = await addToCart.updateOne(query, update);
-
-    if (result.modifiedCount === 0) {
-      console.error("Product not found in cart.");
-      return res.status(404).json({ error: 'Product not found in cart' });
-    }
-
-    res.json({ message: 'Product successfully removed from cart' });
-  } catch (error) {
-    console.error('Error deleting cart item:', error.message);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
+    app.delete('/addToCart/:id', verifyToken, async (req, res) => {
+      try {
+        const { id } = req.params;
+  
+    
+        // No need to convert id to ObjectId since it's stored as a string
+        const query = { "cart._id": id };
+        const update = { $pull: { cart: { _id: id } } };
+    
+        const result = await addToCart.updateOne(query, update);
+    
+        if (result.modifiedCount === 0) {
+          console.error("Product not found in cart.");
+          return res.status(404).json({ error: 'Product not found in cart' });
+        }
+    
+        res.json({ message: 'Product successfully removed from cart' });
+      } catch (error) {
+        console.error('Error deleting cart item:', error.message);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+    
 
 
 
@@ -1113,25 +1096,29 @@ app.delete('/addToCart/:id', verifyToken, async (req, res) => {
       res.status(200).json(result);
     });
 
+
+
+
+    
     // approve patch myOrder
 
-    app.patch('/myOrder/:id', verifyToken, AdminVerify, async (req, res) => {
-      try {
-        const id = req.params.id;
+    // app.patch('/myOrder/:id', verifyToken, AdminVerify, async (req, res) => {
+    //   try {
+    //     const id = req.params.id;
 
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            approve: 'approved'
-          }
-        }
-        const result = await myOrder.updateOne(filter, updatedDoc);
-        res.send(result);
-      } catch (error) {
-        console.error('Error updating user role to admin:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-      }
-    });
+    //     const filter = { _id: new ObjectId(id) };
+    //     const updatedDoc = {
+    //       $set: {
+    //         approve: 'approved'
+    //       }
+    //     }
+    //     const result = await myOrder.updateOne(filter, updatedDoc);
+    //     res.send(result);
+    //   } catch (error) {
+    //     console.error('Error updating user role to admin:', error);
+    //     res.status(500).json({ error: 'Internal Server Error' });
+    //   }
+    // });
 
     // delete approved item from the database 
 
@@ -1154,6 +1141,36 @@ app.delete('/addToCart/:id', verifyToken, async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
       }
     });
+
+//  user myOrder or cart
+
+app.get("/myOrders", verifyToken, async (req, res) => {
+  try {
+    const { email } = req.query; // Get email from query parameters
+
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Find all orders where the email matches the logged-in user
+    const orders = await ordersCollection.find({ email }).toArray();
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for this email" });
+    }
+    console.log(orders, "this is orders")
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+
+
+
 
 // order stats aggregation 
 
@@ -1244,7 +1261,20 @@ app.delete('/addToCart/:id', verifyToken, async (req, res) => {
 
 
 
+// upload slider data
 
+
+app.post("/sliderData", async(req, res) =>{
+  const dataForm  = req.body
+  const result = await SliderData.insertOne(dataForm)
+  res.send(result)
+})
+
+
+app.get("/sliderData", async(req,res) =>{
+  const result = await SliderData.find().toArray()
+  res.send(result)
+})
 
 
 
