@@ -747,7 +747,7 @@ app.delete('/addToCartCookies/:id', async (req, res) => {
         // Check if the user already exists
         const existUser = await usersAll.findOne(query);
         if (existUser) {
-          return res.status(400).send({ message: 'User already exists', insertedId: null });
+          return res.status(200).send({ message: 'User already exists', insertedId: null });
         }
 
         // Insert the new user into the database
