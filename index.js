@@ -1264,14 +1264,14 @@ app.get("/myOrders", verifyToken, async (req, res) => {
 // upload slider data
 
 
-app.post("/sliderData", async(req, res) =>{
+app.post("/SliderData", async(req, res) =>{
   const dataForm  = req.body
   const result = await SliderData.insertOne(dataForm)
   res.send(result)
 })
 
 
-app.get("/sliderData", async(req,res) =>{
+app.get("/SliderData", async(req,res) =>{
   const result = await SliderData.find().toArray()
   res.send(result)
 })
