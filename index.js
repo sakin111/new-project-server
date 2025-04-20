@@ -1259,7 +1259,12 @@ app.get("/myOrders", verifyToken, async (req, res) => {
 // })
 
 
-
+// "functions": {
+//     "index.js": {
+//         "memory": 1024,
+//         "maxDuration": 10
+//     }
+// }
 
 // upload slider data
 
