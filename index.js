@@ -246,131 +246,6 @@ app.get("/addToCartCookies/:id", async (req, res) => {
 });
 
 
-    // single item
-
-    // app.get("/addToCartCookies/:id", async (req, res) => {
-    //   try {
-    //     const { id } = req.params;
-    
-    //     // Validate ID format
-    //     if (!ObjectId.isValid(id)) {
-    //       return res.status(400).json({ message: "Invalid ID format" });
-    //     }
-    
-    //     // Query the document and fetch only the matching cart item
-    //     const result = await guestCarts.findOne({ _id: new ObjectId({id}) });
- 
-    
-    //     if (!result || !result.cart || result.cart.length === 0) {
-    //       return res.status(404).json({ message: "Item not found" });
-    //     }
-   
-    //     res.status(200).json(result); // Return the specific item
-    //   } catch (error) {
-    //     console.error("Error fetching cart item:", error);
-    //     res.status(500).json({ error: "Internal Server Error" });
-    //   }
-    // });
-
-// app.post("/OrderCookies", async (req, res) => {
-//   try {
-//     const { cookiesItem } = req.body; // Access the cookies item from the request body
-
-//     // Process the order with cookiesItem
-//     const result = await guestCartsApprove.insertOne({ cookiesItem });
-
-//     res.send(result);
-//   } catch (error) {
-//     console.error('Error placing order:', error);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// });
-
-
-
-
-    // cookies checked   
-
-
-//  app.patch('/CartCookies', async (req, res) => {
-//   try {
-//     const { check, payload } = req.body;
-    
-
-//     if (!check) {
-//       return res.status(400).json({ error: 'The "check" field is required.' });
-//     }
-
-//     const sessionId = req.cookies.guestSessionId;
-
-//     if (!sessionId) {
-//       return res.status(400).json({ error: 'Session ID is missing in cookies.' });
-//     }
-
-//     // Perform the update
-//     const result = await guestCarts.updateOne(
-//       { sessionId }, // Filter by session ID
-//       { $set: { check, ...payload } }, // Update fields
-    
-//     );
-
-//     if (result.matchedCount === 0) {
-//       return res.status(404).json({ message: 'No matching cart items found for the session.' });
-//     }
-
-//     res.json({ success: true, modifiedCount: result.modifiedCount });
-//   } catch (error) {
-//     console.error("Error updating cart:", error);
-//     res.status(500).json({ error: 'Internal Server Error', details: error.message });
-//   }
-// });
-
-    
-    
-// cookies add address 
-
-// app.patch('/addCookiesAddress', async (req, res) => {
-//   try {
-//     const { cookiesAddress } = req.body;  // This is the updated address
-
-
-//     if (!cookiesAddress) {
-//       return res.status(400).json({ error: 'The "cookiesAddress" field is required.' });
-//     }
-
-//     const sessionId = req.cookies.guestSessionId;  // Get the session ID from cookies
-
-//     if (!sessionId) {
-//       return res.status(400).json({ error: 'Session ID is missing in cookies.' });
-//     }
-
-//     // Update the cookiesAddress, clear the cart, and reset the check status
-//     const updateResult = await guestCarts.updateOne(
-//       { sessionId }, // Filter by session ID
-//       {
-//         $set: {
-//           cookiesAddress,   // Update cookiesAddress with new data
-//         },
-      
-//       }
-//     );
-
-//     if (updateResult.matchedCount === 0) {
-//       return res.status(404).json({ message: 'No matching cart items found for the session.' });
-//     }
-
-//     res.json({
-//       success: true,
-//       modifiedCount: updateResult.modifiedCount // Return how many documents were modified
-//     });
-//   } catch (error) {
-//     console.error("Error updating cart:", error);
-//     res.status(500).json({ error: 'Internal Server Error', details: error.message });
-//   }
-// });
-
-
-
 
 
 
@@ -573,14 +448,6 @@ app.delete('/addToCartCookies/:id', async (req, res) => {
     })
 
  
-
-    // app.post("/addToCart", async (req, res) => {
-    //   const ToCart = req.body;
-    //   console.log(ToCart)
-    //   const result = await addToCart.insertOne(ToCart);
-    //   res.send(result);
-    // });
-
 
     // payment getWay
 
@@ -982,20 +849,6 @@ app.patch('/addToCart', verifyToken, async (req, res) => {
     })
 
 
-    // all addToCart item
-
-// app.get("/addToCart", verifyToken, async (req, res) => {
-//       try {
-//         const { email } = req.params;
-//         const result = await addToCart.find({ email }).toArray(); // Fetch items for this specific email
-//         res.send(result);
-
-//       } catch (error) {
-//         console.error("Error fetching cart data:", error);
-//         res.status(500).json({ error: "Internal Server Error" });
-//       }
-//     });   
-
 
 
  
@@ -1100,25 +953,8 @@ app.get("/addToCart", verifyToken, async (req, res) => {
 
 
     
-    // approve patch myOrder
+   
 
-    // app.patch('/myOrder/:id', verifyToken, AdminVerify, async (req, res) => {
-    //   try {
-    //     const id = req.params.id;
-
-    //     const filter = { _id: new ObjectId(id) };
-    //     const updatedDoc = {
-    //       $set: {
-    //         approve: 'approved'
-    //       }
-    //     }
-    //     const result = await myOrder.updateOne(filter, updatedDoc);
-    //     res.send(result);
-    //   } catch (error) {
-    //     console.error('Error updating user role to admin:', error);
-    //     res.status(500).json({ error: 'Internal Server Error' });
-    //   }
-    // });
 
     // delete approved item from the database 
 
